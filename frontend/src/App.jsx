@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import {
   MapContainer,
   TileLayer,
@@ -11,7 +12,15 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
 
+import Chatbot from "./Chatbot";
+
+
+// ============================================================
+// BACKEND API
+// ============================================================
+
 const API_URL = "http://127.0.0.1:5000";
+
 
 // ============================================================
 // FIX LEAFLET DEFAULT MARKER ICON
@@ -20,6 +29,7 @@ const API_URL = "http://127.0.0.1:5000";
 delete L.Icon.Default.prototype._getIconUrl;
 
 L.Icon.Default.mergeOptions({
+
   iconRetinaUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
 
@@ -28,6 +38,7 @@ L.Icon.Default.mergeOptions({
 
   shadowUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+
 });
 
 
@@ -36,6 +47,10 @@ L.Icon.Default.mergeOptions({
 // ============================================================
 
 function App() {
+
+  // ==========================================================
+  // STATE
+  // ==========================================================
 
   const [city, setCity] = useState("");
 
@@ -54,10 +69,13 @@ function App() {
   const [lastUpdated, setLastUpdated] =
     useState(null);
 
+  const [showChatbot, setShowChatbot] =
+    useState(false);
 
-  // ============================================================
+
+  // ==========================================================
   // ENABLE BROWSER NOTIFICATIONS
-  // ============================================================
+  // ==========================================================
 
   const enableNotifications = async () => {
 
@@ -94,6 +112,7 @@ function App() {
         alert(
           "Notification permission was not granted."
         );
+
       }
 
     } catch (err) {
@@ -102,13 +121,15 @@ function App() {
         "Notification error:",
         err
       );
+
     }
+
   };
 
 
-  // ============================================================
+  // ==========================================================
   // SEND BROWSER NOTIFICATION
-  // ============================================================
+  // ==========================================================
 
   const sendBrowserNotification = (data) => {
 
@@ -141,17 +162,19 @@ function App() {
 
       title =
         "🚨 EMERGENCY ALERT";
+
     }
 
     try {
 
-      new Notification(title, {
-
-        body:
-          data.alert_message ||
-          `${data.predicted_disaster} risk detected in ${data.city}.`,
-
-      });
+      new Notification(
+        title,
+        {
+          body:
+            data.alert_message ||
+            `${data.predicted_disaster || "Disaster"} risk detected in ${data.city || city}.`,
+        }
+      );
 
     } catch (err) {
 
@@ -159,13 +182,15 @@ function App() {
         "Could not send notification:",
         err
       );
+
     }
+
   };
 
 
-  // ============================================================
-  // CHECK RISK
-  // ============================================================
+  // ==========================================================
+  // CHECK DISASTER RISK
+  // ==========================================================
 
   const checkRisk = async () => {
 
@@ -193,31 +218,246 @@ function App() {
           )}`
         );
 
-      const data =
-        await response.json();
+
+      // ======================================================
+      // READ RESPONSE SAFELY
+      // ======================================================
+
+      const text =
+        await response.text();
+
+      let data;
+
+      try {
+
+        data =
+          JSON.parse(text);
+
+      } catch {
+
+        throw new Error(
+          "Backend returned an invalid JSON response."
+        );
+
+      }
+
 
       if (!response.ok) {
 
         throw new Error(
           data.error ||
-          "Unable to get prediction."
+          "Unable to get disaster prediction."
         );
+
       }
+
 
       console.log(
         "Prediction response:",
         data
       );
 
-      setPrediction(data);
+
+      // ======================================================
+      // WEATHER MAY BE NESTED OR DIRECT
+      // ======================================================
+
+      const weather =
+        data.weather ||
+        data;
+
+
+      // ======================================================
+      // COORDINATES
+      //
+      // Supports:
+      //
+      // data.latitude
+      // data.weather.latitude
+      // data.coord.lat
+      // data.weather.coord.lat
+      // ======================================================
+
+      const latitude =
+        data.latitude ??
+        weather.latitude ??
+        data.coord?.lat ??
+        weather.coord?.lat ??
+        null;
+
+
+      const longitude =
+        data.longitude ??
+        weather.longitude ??
+        data.coord?.lon ??
+        weather.coord?.lon ??
+        null;
+
+
+      // ======================================================
+      // IZE RESPONSE
+      // ======================================================
+
+      const izedData = {
+
+        ...data,
+
+        city:
+          data.city ??
+          weather.city ??
+          city.trim(),
+
+
+        // ----------------------------------------------------
+        // WEATHER
+        // ----------------------------------------------------
+
+        temperature:
+          data.temperature ??
+          weather.temperature ??
+          weather.main?.temp ??
+          null,
+
+
+        humidity:
+          data.humidity ??
+          weather.humidity ??
+          weather.main?.humidity ??
+          null,
+
+
+        rainfall:
+          data.rainfall ??
+          weather.rainfall ??
+          weather.rain?.["1h"] ??
+          weather.rain?.["3h"] ??
+          0,
+
+
+        wind_speed:
+          data.wind_speed ??
+          weather.wind_speed ??
+          weather.wind?.speed ??
+          null,
+
+
+        pressure:
+          data.pressure ??
+          weather.pressure ??
+          weather.main?.pressure ??
+          null,
+
+
+        description:
+          data.description ??
+          weather.description ??
+          weather.weather?.[0]?.description ??
+          "",
+
+
+        // ----------------------------------------------------
+        // LOCATION
+        // ----------------------------------------------------
+
+        latitude:
+          latitude,
+
+
+        longitude:
+          longitude,
+
+
+        // ----------------------------------------------------
+        // PREDICTION
+        // ----------------------------------------------------
+
+        predicted_disaster:
+          data.predicted_disaster ??
+          data.disaster ??
+          data.prediction?.predicted_disaster ??
+          data.prediction?.disaster ??
+          "",
+
+
+        risk:
+          data.risk ??
+          data.prediction?.risk ??
+          "Low",
+
+
+        probability:
+          data.probability ??
+          data.prediction?.probability ??
+          0,
+
+
+        // ----------------------------------------------------
+        // OTHER DISASTER PROBABILITIES
+        // ----------------------------------------------------
+
+        flood_probability:
+          data.flood_probability ??
+          data.prediction?.flood_probability ??
+          0,
+
+
+        cyclone_probability:
+          data.cyclone_probability ??
+          data.prediction?.cyclone_probability ??
+          0,
+
+
+        heatwave_probability:
+          data.heatwave_probability ??
+          data.prediction?.heatwave_probability ??
+          0,
+
+
+        // ----------------------------------------------------
+        // ALERT
+        // ----------------------------------------------------
+
+        alert:
+          data.alert ??
+          false,
+
+
+        alert_level:
+          data.alert_level ??
+          "",
+
+
+        alert_message:
+          data.alert_message ??
+          "",
+
+      };
+
+
+      console.log(
+        "ized prediction:",
+        izedData
+      );
+
+
+      // ======================================================
+      // SAVE DATA
+      // ======================================================
+
+      setPrediction(
+        izedData
+      );
+
 
       setLastUpdated(
         new Date().toLocaleString()
       );
 
+
       sendBrowserNotification(
-        data
+        izedData
       );
+
 
     } catch (err) {
 
@@ -226,21 +466,25 @@ function App() {
         err
       );
 
+
       setError(
         err.message ||
-        "Unable to connect to the backend."
+        "Unable to connect to the Flask backend."
       );
+
 
     } finally {
 
       setLoading(false);
+
     }
+
   };
 
 
-  // ============================================================
-  // HANDLE ENTER KEY
-  // ============================================================
+  // ==========================================================
+  // ENTER KEY
+  // ==========================================================
 
   const handleKeyDown = (event) => {
 
@@ -250,13 +494,15 @@ function App() {
     ) {
 
       checkRisk();
+
     }
+
   };
 
 
-  // ============================================================
-  // GET RISK CLASS
-  // ============================================================
+  // ==========================================================
+  // RISK CLASS
+  // ==========================================================
 
   const getRiskClass = (risk) => {
 
@@ -279,13 +525,15 @@ function App() {
 
       default:
         return "";
+
     }
+
   };
 
 
-  // ============================================================
-  // GET DISASTER ICON
-  // ============================================================
+  // ==========================================================
+  // DISASTER ICON
+  // ==========================================================
 
   const getDisasterIcon = (
     disaster
@@ -298,41 +546,60 @@ function App() {
     const value =
       disaster.toLowerCase();
 
+
     if (
       value.includes("flood")
     ) {
 
       return "🌊";
+
     }
+
 
     if (
       value.includes("cyclone")
     ) {
 
       return "🌀";
+
     }
+
 
     if (
       value.includes("heat")
     ) {
 
       return "🔥";
+
     }
 
+
     if (
-      value.includes("normal")
+      value.includes("fire")
+    ) {
+
+      return "🔥";
+
+    }
+
+
+    if (
+      value.includes("")
     ) {
 
       return "✅";
+
     }
 
+
     return "⚠️";
+
   };
 
 
-  // ============================================================
-  // GET RISK ICON
-  // ============================================================
+  // ==========================================================
+  // RISK ICON
+  // ==========================================================
 
   const getRiskIcon = (
     risk
@@ -357,13 +624,15 @@ function App() {
 
       default:
         return "ℹ️";
+
     }
+
   };
 
 
-  // ============================================================
-  // MAP RISK COLOR
-  // ============================================================
+  // ==========================================================
+  // MAP COLOR
+  // ==========================================================
 
   const getMapColor = (
     risk
@@ -388,46 +657,75 @@ function App() {
 
       default:
         return "green";
+
     }
+
   };
 
 
-  // ============================================================
-  // MAP
-  // ============================================================
+  // ==========================================================
+  // DISASTER RISK MAP
+  // ==========================================================
 
   const RiskMap = () => {
 
     if (
       !prediction ||
+      prediction.latitude === null ||
       prediction.latitude === undefined ||
+      prediction.longitude === null ||
       prediction.longitude === undefined
     ) {
 
       return (
+
         <div className="map-error">
 
           📍 Location coordinates
           are not available.
 
         </div>
+
       );
+
     }
+
 
     const latitude =
       Number(
         prediction.latitude
       );
 
+
     const longitude =
       Number(
         prediction.longitude
       );
 
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+
+      return (
+
+        <div className="map-error">
+
+          📍 Invalid location coordinates.
+
+        </div>
+
+      );
+
+    }
+
+
     const mapColor =
       getMapColor(
         prediction.risk
       );
+
 
     return (
 
@@ -451,10 +749,6 @@ function App() {
 
         >
 
-          {/* ==================================================
-              OPEN STREET MAP
-              ================================================== */}
-
           <TileLayer
 
             attribution='&copy; OpenStreetMap contributors'
@@ -464,15 +758,13 @@ function App() {
           />
 
 
-          {/* ==================================================
-              CITY MARKER
-              ================================================== */}
-
           <Marker
+
             position={[
               latitude,
               longitude
             ]}
+
           >
 
             <Popup>
@@ -480,54 +772,64 @@ function App() {
               <div className="map-popup">
 
                 <h3>
+
                   📍 {prediction.city}
+
                 </h3>
+
 
                 <p>
 
                   <strong>
                     Disaster:
-                  </strong>
-
-                  {" "}
+                  </strong>{" "}
 
                   {getDisasterIcon(
                     prediction.predicted_disaster
-                  )}
-
-                  {" "}
+                  )}{" "}
 
                   {prediction.predicted_disaster}
 
                 </p>
 
+
                 <p>
 
                   <strong>
                     Risk:
-                  </strong>
-
-                  {" "}
+                  </strong>{" "}
 
                   {getRiskIcon(
                     prediction.risk
-                  )}
-
-                  {" "}
+                  )}{" "}
 
                   {prediction.risk}
 
                 </p>
 
+
                 <p>
 
                   <strong>
                     Probability:
-                  </strong>
-
-                  {" "}
+                  </strong>{" "}
 
                   {prediction.probability}%
+
+                </p>
+
+
+                <p>
+
+                  <strong>
+                    Coordinates:
+                  </strong>
+
+                  <br />
+
+                  {latitude.toFixed(4)},
+                  {" "}
+                  {longitude.toFixed(4)}
 
                 </p>
 
@@ -537,10 +839,6 @@ function App() {
 
           </Marker>
 
-
-          {/* ==================================================
-              RISK AREA
-              ================================================== */}
 
           <Circle
 
@@ -563,15 +861,12 @@ function App() {
         </MapContainer>
 
 
-        {/* ==================================================
-            MAP LEGEND
-            ================================================== */}
-
         <div className="map-legend">
 
           <div className="legend-title">
             Risk Level
           </div>
+
 
           <div className="legend-item">
 
@@ -581,6 +876,7 @@ function App() {
 
           </div>
 
+
           <div className="legend-item">
 
             <span className="legend-dot moderate"></span>
@@ -588,6 +884,7 @@ function App() {
             Moderate Risk
 
           </div>
+
 
           <div className="legend-item">
 
@@ -600,13 +897,15 @@ function App() {
         </div>
 
       </div>
+
     );
+
   };
 
 
-  // ============================================================
+  // ==========================================================
   // RENDER
-  // ============================================================
+  // ==========================================================
 
   return (
 
@@ -615,7 +914,7 @@ function App() {
 
       {/* ======================================================
           HEADER
-          ====================================================== */}
+      ====================================================== */}
 
       <header className="header">
 
@@ -625,11 +924,13 @@ function App() {
             🌍
           </div>
 
+
           <div>
 
             <h1>
               AI Disaster Prediction
             </h1>
+
 
             <p>
               Real-time weather risk monitoring
@@ -640,46 +941,63 @@ function App() {
         </div>
 
 
-        <button
+        <div className="header-actions">
 
-          className="notification-button"
+          <button
 
-          onClick={
-            enableNotifications
-          }
+            className="notification-button"
 
-        >
+            onClick={
+              enableNotifications
+            }
 
-          {notificationEnabled
-            ? "🔔 Alerts Enabled"
-            : "🔕 Enable Alerts"}
+          >
 
-        </button>
+            {notificationEnabled
+              ? "🔔 Alerts Enabled"
+              : "🔕 Enable Alerts"}
+
+          </button>
+
+
+          
+
+        </div>
 
       </header>
 
 
       {/* ======================================================
           MAIN
-          ====================================================== */}
+      ====================================================== */}
 
       <main className="container">
 
 
         {/* ====================================================
             SEARCH
-            ==================================================== */}
+        ==================================================== */}
 
         <section className="search-card">
 
-          <h2>
-            Check Disaster Risk
-          </h2>
+          <div>
 
-          <p>
-            Enter a city to analyze current
-            weather conditions using AI.
-          </p>
+            <p className="section-label">
+              AI DISASTER MONITORING
+            </p>
+
+
+            <h2>
+              Check Disaster Risk
+            </h2>
+
+
+            <p>
+              Enter a city to analyze current
+              weather conditions using AI.
+            </p>
+
+          </div>
 
 
           <div className="search-row">
@@ -730,7 +1048,7 @@ function App() {
 
         {/* ====================================================
             ERROR
-            ==================================================== */}
+        ==================================================== */}
 
         {error && (
 
@@ -740,11 +1058,13 @@ function App() {
               ❌
             </span>
 
+
             <div>
 
               <strong>
                 Error
               </strong>
+
 
               <p>
                 {error}
@@ -759,7 +1079,7 @@ function App() {
 
         {/* ====================================================
             LOADING
-            ==================================================== */}
+        ==================================================== */}
 
         {loading && (
 
@@ -767,9 +1087,11 @@ function App() {
 
             <div className="spinner"></div>
 
+
             <h3>
               Analyzing weather conditions...
             </h3>
+
 
             <p>
               AI is checking the current
@@ -783,7 +1105,7 @@ function App() {
 
         {/* ====================================================
             ALERT
-            ==================================================== */}
+        ==================================================== */}
 
         {!loading &&
           prediction?.alert && (
@@ -825,11 +1147,12 @@ function App() {
 
                   {getDisasterIcon(
                     prediction.predicted_disaster
-                  )}
+                  )}{" "}
 
-                  {" "}
-
-                  {prediction.predicted_disaster?.toUpperCase()}
+                  {(
+                    prediction.predicted_disaster ||
+                    "DISASTER"
+                  ).toUpperCase()}
 
                   {" "}RISK DETECTED
 
@@ -868,7 +1191,8 @@ function App() {
 
                 <p className="alert-message">
 
-                  {prediction.alert_message}
+                  {prediction.alert_message ||
+                    "Please monitor official weather alerts."}
 
                 </p>
 
@@ -896,7 +1220,7 @@ function App() {
 
         {/* ====================================================
             RESULTS
-            ==================================================== */}
+        ==================================================== */}
 
         {!loading &&
           prediction && (
@@ -906,7 +1230,7 @@ function App() {
 
             {/* ==================================================
                 AI PREDICTION
-                ================================================== */}
+            ================================================== */}
 
             <section className="result-card">
 
@@ -917,6 +1241,7 @@ function App() {
                   <p className="section-label">
                     AI PREDICTION
                   </p>
+
 
                   <h2>
                     Disaster Risk Analysis
@@ -937,11 +1262,12 @@ function App() {
 
                   {getRiskIcon(
                     prediction.risk
-                  )}
+                  )}{" "}
 
-                  {" "}
-
-                  {prediction.risk?.toUpperCase()}
+                  {(
+                    prediction.risk ||
+                    "Low"
+                  ).toUpperCase()}
 
                   {" "}RISK
 
@@ -967,8 +1293,10 @@ function App() {
                     Predicted Condition
                   </p>
 
+
                   <h3>
-                    {prediction.predicted_disaster}
+                    {prediction.predicted_disaster ||
+                      ""}
                   </h3>
 
                 </div>
@@ -980,8 +1308,9 @@ function App() {
                     Probability
                   </span>
 
+
                   <strong>
-                    {prediction.probability}%
+                    {prediction.probability ?? 0}%
                   </strong>
 
                 </div>
@@ -993,7 +1322,7 @@ function App() {
 
             {/* ==================================================
                 WEATHER DATA
-                ================================================== */}
+            ================================================== */}
 
             <section className="section">
 
@@ -1004,6 +1333,7 @@ function App() {
                   <p className="section-label">
                     LIVE DATA
                   </p>
+
 
                   <h2>
                     Weather Conditions
@@ -1030,12 +1360,14 @@ function App() {
                     🌡️
                   </div>
 
+
                   <span>
                     Temperature
                   </span>
 
+
                   <strong>
-                    {prediction.temperature}°C
+                    {prediction.temperature ?? "--"}°C
                   </strong>
 
                 </div>
@@ -1047,12 +1379,14 @@ function App() {
                     💧
                   </div>
 
+
                   <span>
                     Humidity
                   </span>
 
+
                   <strong>
-                    {prediction.humidity}%
+                    {prediction.humidity ?? "--"}%
                   </strong>
 
                 </div>
@@ -1064,12 +1398,14 @@ function App() {
                     🌧️
                   </div>
 
+
                   <span>
                     Rainfall
                   </span>
 
+
                   <strong>
-                    {prediction.rainfall} mm
+                    {prediction.rainfall ?? 0} mm
                   </strong>
 
                 </div>
@@ -1081,12 +1417,14 @@ function App() {
                     💨
                   </div>
 
+
                   <span>
                     Wind Speed
                   </span>
 
+
                   <strong>
-                    {prediction.wind_speed} m/s
+                    {prediction.wind_speed ?? "--"} m/s
                   </strong>
 
                 </div>
@@ -1098,12 +1436,14 @@ function App() {
                     📊
                   </div>
 
+
                   <span>
                     Pressure
                   </span>
 
+
                   <strong>
-                    {prediction.pressure} hPa
+                    {prediction.pressure ?? "--"} hPa
                   </strong>
 
                 </div>
@@ -1114,8 +1454,8 @@ function App() {
 
 
             {/* ==================================================
-                DISASTER MAP
-                ================================================== */}
+                MAP
+            ================================================== */}
 
             <section className="section">
 
@@ -1126,6 +1466,7 @@ function App() {
                   <p className="section-label">
                     LIVE LOCATION
                   </p>
+
 
                   <h2>
                     🗺️ Disaster Risk Map
@@ -1150,7 +1491,7 @@ function App() {
 
             {/* ==================================================
                 OTHER DISASTER RISKS
-                ================================================== */}
+            ================================================== */}
 
             <section className="section">
 
@@ -1161,6 +1502,7 @@ function App() {
                   <p className="section-label">
                     AI ANALYSIS
                   </p>
+
 
                   <h2>
                     Other Disaster Risks
@@ -1184,6 +1526,7 @@ function App() {
                       🌊
                     </span>
 
+
                     <span>
                       Flood
                     </span>
@@ -1206,7 +1549,9 @@ function App() {
 
                       style={{
                         width: `${Math.min(
-                          prediction.flood_probability ?? 0,
+                          Number(
+                            prediction.flood_probability ?? 0
+                          ),
                           100
                         )}%`
                       }}
@@ -1227,6 +1572,7 @@ function App() {
                     <span className="disaster-icon">
                       🌀
                     </span>
+
 
                     <span>
                       Cyclone
@@ -1250,7 +1596,9 @@ function App() {
 
                       style={{
                         width: `${Math.min(
-                          prediction.cyclone_probability ?? 0,
+                          Number(
+                            prediction.cyclone_probability ?? 0
+                          ),
                           100
                         )}%`
                       }}
@@ -1271,6 +1619,7 @@ function App() {
                     <span className="disaster-icon">
                       🔥
                     </span>
+
 
                     <span>
                       Heatwave
@@ -1294,7 +1643,9 @@ function App() {
 
                       style={{
                         width: `${Math.min(
-                          prediction.heatwave_probability ?? 0,
+                          Number(
+                            prediction.heatwave_probability ?? 0
+                          ),
                           100
                         )}%`
                       }}
@@ -1311,8 +1662,8 @@ function App() {
 
 
             {/* ==================================================
-                SAFETY MESSAGE
-                ================================================== */}
+                SAFETY INFORMATION
+            ================================================== */}
 
             <section className="safety-card">
 
@@ -1378,7 +1729,7 @@ function App() {
 
             {/* ==================================================
                 EMERGENCY CONTACTS
-                ================================================== */}
+            ================================================== */}
 
             {prediction.risk ===
               "High" && (
@@ -1394,11 +1745,8 @@ function App() {
 
 
                   <a
-
                     href="tel:112"
-
                     className="contact-button"
-
                   >
 
                     🚨
@@ -1415,11 +1763,8 @@ function App() {
 
 
                   <a
-
                     href="tel:108"
-
                     className="contact-button"
-
                   >
 
                     🚑
@@ -1436,11 +1781,8 @@ function App() {
 
 
                   <a
-
                     href="tel:101"
-
                     className="contact-button"
-
                   >
 
                     🚒
@@ -1464,7 +1806,7 @@ function App() {
 
             {/* ==================================================
                 LAST UPDATED
-                ================================================== */}
+            ================================================== */}
 
             <div className="last-updated">
 
@@ -1483,8 +1825,65 @@ function App() {
 
 
       {/* ======================================================
+          FLOATING AI BUTTON
+      ====================================================== */}
+
+      {!showChatbot && (
+
+        <button
+
+          className="chatbot-floating-button"
+
+          onClick={() =>
+            setShowChatbot(true)
+          }
+
+          aria-label="Open Disaster AI Assistant"
+
+        >
+
+          🤖
+
+        </button>
+
+      )}
+
+
+      {/* ======================================================
+          CHATBOT PANEL
+      ====================================================== */}
+
+      {showChatbot && (
+
+        <div className="chatbot-wrapper">
+
+          <button
+
+            className="chatbot-close"
+
+            onClick={() =>
+              setShowChatbot(false)
+            }
+
+            aria-label="Close Disaster AI Assistant"
+
+          >
+
+            ✕
+
+          </button>
+
+
+          <Chatbot />
+
+        </div>
+
+      )}
+
+
+      {/* ======================================================
           FOOTER
-          ====================================================== */}
+      ====================================================== */}
 
       <footer className="footer">
 
@@ -1492,14 +1891,20 @@ function App() {
           AI Disaster Prediction & Alert System
         </p>
 
+
         <span>
           Weather data powered by OpenWeather
+          {" • "}
+          AI Assistant powered by Groq AI
         </span>
 
       </footer>
 
     </div>
+
   );
+
 }
+
 
 export default App;
