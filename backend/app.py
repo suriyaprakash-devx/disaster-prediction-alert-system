@@ -15,7 +15,7 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -55,10 +55,21 @@ GROQ_MODEL = (os.getenv("GROQ_MODEL") or "openai/gpt-oss-120b").strip().strip('"
 
 
 # ============================================================
-# FLASK APP
+# FLASK APP & STATIC FRONTEND SERVING
 # ============================================================
 
-app = Flask(__name__)
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(_backend_dir, "static")
+if not os.path.exists(STATIC_DIR):
+    _alt_dist = os.path.abspath(os.path.join(_backend_dir, "..", "frontend", "dist"))
+    if os.path.exists(_alt_dist):
+        STATIC_DIR = _alt_dist
+
+app = Flask(
+    __name__,
+    static_folder=STATIC_DIR if os.path.exists(STATIC_DIR) else None,
+    static_url_path=""
+)
 
 CORS(app)
 
@@ -1039,30 +1050,34 @@ def create_alert(
 
 
 # ============================================================
-# HOME
+# HOME & STATIC ROUTING
 # ============================================================
 
-@app.route(
-
-    "/",
-
-    methods=["GET"]
-
-)
-
+@app.route("/", methods=["GET"])
 def home():
+    if STATIC_DIR and os.path.exists(STATIC_DIR):
+        index_path = os.path.join(STATIC_DIR, "index.html")
+        if os.path.exists(index_path):
+            return send_from_directory(STATIC_DIR, "index.html")
 
     return jsonify({
-
-        "message":
-
-            "AI Disaster Prediction API is running!",
-
-        "status":
-
-            "online"
-
+        "message": "AI Disaster Prediction API is running!",
+        "status": "online"
     })
+
+
+@app.errorhandler(404)
+def handle_404(e):
+    if STATIC_DIR and os.path.exists(STATIC_DIR):
+        req_path = request.path.lstrip("/")
+        target = os.path.join(STATIC_DIR, req_path)
+        if os.path.exists(target) and os.path.isfile(target):
+            return send_from_directory(STATIC_DIR, req_path)
+        index_path = os.path.join(STATIC_DIR, "index.html")
+        if os.path.exists(index_path):
+            return send_from_directory(STATIC_DIR, "index.html")
+
+    return jsonify({"error": "Resource not found"}), 404
 
 
 # ============================================================
