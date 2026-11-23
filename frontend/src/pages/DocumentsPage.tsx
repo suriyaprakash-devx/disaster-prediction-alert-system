@@ -64,14 +64,14 @@ export const DocumentsPage: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-white">Enterprise Document Vault</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Ingest PDF, DOCX, TXT, and CSV documents into semantic vector memory.
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900">Enterprise Document Vault</h2>
+        <p className="text-sm text-slate-500 mt-1">
+          Ingest PDF, DOCX, TXT, and CSV documents into semantic vector memory for grounded RAG intelligence.
         </p>
       </div>
 
-      {/* Upload Zone */}
-      <div className="bg-slate-950 p-8 rounded-2xl border-2 border-dashed border-slate-800 hover:border-emerald-500/50 transition-colors text-center relative">
+      {/* Upload Dropzone */}
+      <div className="bg-emerald-50/40 p-8 rounded-2xl border-2 border-dashed border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50/80 transition-all text-center relative shadow-xs">
         <input
           type="file"
           accept=".pdf,.docx,.txt,.csv"
@@ -80,31 +80,31 @@ export const DocumentsPage: React.FC = () => {
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
         />
         <div className="flex flex-col items-center justify-center space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+          <div className="w-12 h-12 rounded-xl bg-white text-emerald-600 flex items-center justify-center shadow-xs border border-emerald-200">
             <UploadCloud className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-200">
-              {isUploading ? 'Extracting, chunking & indexing vectors...' : 'Click to upload or drag & drop files'}
+            <p className="text-sm font-bold text-slate-900">
+              {isUploading ? 'Extracting text, chunking & computing vector embeddings...' : 'Click to upload or drag & drop files'}
             </p>
-            <p className="text-xs text-slate-500 mt-1">Supported: PDF, DOCX, TXT, CSV (Max 25MB)</p>
+            <p className="text-xs text-slate-500 mt-1">Supported formats: PDF, DOCX, TXT, CSV (Maximum size: 25MB)</p>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-950/30 border border-red-800 text-red-300 text-xs flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
+          <span className="font-medium">{error}</span>
         </div>
       )}
 
-      {/* Documents List */}
-      <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-        <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-200">Indexed Knowledge Files</h3>
-          <span className="text-xs bg-slate-900 text-slate-400 px-2.5 py-1 rounded-full border border-slate-800">
-            {documents.length} files
+      {/* Documents Table / Card List */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h3 className="text-sm font-bold text-slate-800">Indexed Knowledge Files</h3>
+          <span className="text-xs bg-white text-slate-600 font-semibold px-3 py-1 rounded-full border border-slate-200 shadow-xs">
+            {documents.length} files indexed
           </span>
         </div>
 
@@ -113,17 +113,19 @@ export const DocumentsPage: React.FC = () => {
             No documents indexed yet. Upload an operational document or policy above.
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/60">
+          <div className="divide-y divide-slate-100">
             {documents.map((doc) => (
-              <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-900/40 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center text-emerald-400 border border-slate-800">
+              <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700 border border-emerald-100">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-slate-200">{doc.title}</h4>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                      <span className="uppercase font-mono text-[11px] text-emerald-400/80">{doc.file_type}</span>
+                    <h4 className="text-sm font-bold text-slate-800">{doc.title}</h4>
+                    <div className="flex items-center gap-2.5 text-xs text-slate-500 mt-0.5">
+                      <span className="uppercase font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        {doc.file_type}
+                      </span>
                       <span>•</span>
                       <span>{formatFileSize(doc.file_size)}</span>
                       <span>•</span>
@@ -134,10 +136,10 @@ export const DocumentsPage: React.FC = () => {
 
                 <div className="flex items-center gap-3">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
                       doc.status === 'processed'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
                     }`}
                   >
                     {doc.status === 'processed' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}

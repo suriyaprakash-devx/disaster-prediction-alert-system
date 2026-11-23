@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Play, CheckCircle2, XCircle, Clock, AlertTriangle, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Bot, Play, CheckCircle2, XCircle, Clock, AlertTriangle, ShieldCheck, ArrowRight, UserCheck } from 'lucide-react';
 import { apiClient } from '../api/client';
 
 interface AgentStep {
@@ -97,24 +97,24 @@ export const AgentsPage: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-          LangGraph Multi-Agent Orchestrator <Bot className="w-5 h-5 text-purple-400" />
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+          LangGraph Multi-Agent Orchestrator <Bot className="w-5 h-5 text-purple-600" />
         </h2>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-slate-500 mt-1">
           Autonomous state-machine execution with mandatory human approval gating for high-impact actions.
         </p>
       </div>
 
       {/* Trigger Workflow Box */}
-      <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-        <h3 className="text-sm font-semibold text-white mb-4">Dispatch Autonomous Business Agent</h3>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs">
+        <h3 className="text-sm font-bold text-slate-900 mb-4">Dispatch Autonomous Business Agent</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-xs text-slate-400 block mb-1">Workflow Template</label>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Workflow Template</label>
             <select
               value={workflowType}
               onChange={(e) => setWorkflowType(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white"
             >
               <option value="invoice_payment">Automated Vendor Payment</option>
               <option value="refund_issuance">Customer Refund Authorization</option>
@@ -123,14 +123,14 @@ export const AgentsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 block mb-1">
-              Transaction Value ($ USD) <span className="text-amber-400 text-[11px]">(Approval required if ≥ $1,000)</span>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Transaction Value ($ USD) <span className="text-amber-600 font-bold text-[11px]">(Approval required if ≥ $1,000)</span>
             </label>
             <input
               type="number"
               value={amountInput}
               onChange={(e) => setAmountInput(Number(e.target.value))}
-              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-purple-500 font-mono"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white font-mono"
             />
           </div>
 
@@ -138,7 +138,7 @@ export const AgentsPage: React.FC = () => {
             <button
               onClick={handleTriggerAgent}
               disabled={isRunning}
-              className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-medium text-sm transition-colors shadow-lg shadow-purple-600/20"
+              className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white font-semibold text-sm transition-all shadow-xs cursor-pointer"
             >
               <Play className="w-4 h-4 fill-white" />
               <span>{isRunning ? 'Orchestrating...' : 'Trigger Workflow'}</span>
@@ -149,32 +149,32 @@ export const AgentsPage: React.FC = () => {
 
       {/* Human Approval Queue (High Priority) */}
       {approvals.some((a) => a.status === 'pending') && (
-        <div className="bg-amber-950/20 border border-amber-800/60 p-6 rounded-2xl space-y-4">
-          <div className="flex items-center gap-2 text-amber-400">
-            <AlertTriangle className="w-5 h-5" />
+        <div className="bg-amber-50/70 border border-amber-200 p-6 rounded-2xl space-y-4 shadow-xs">
+          <div className="flex items-center gap-2 text-amber-800">
+            <UserCheck className="w-5 h-5 text-amber-600" />
             <h3 className="text-sm font-bold uppercase tracking-wider">Human-in-the-Loop Action Required</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {approvals
               .filter((a) => a.status === 'pending')
               .map((appr) => (
-                <div key={appr.id} className="bg-slate-950 p-4 rounded-xl border border-amber-800/50 flex flex-col justify-between gap-3">
+                <div key={appr.id} className="bg-white p-5 rounded-xl border border-amber-200/80 flex flex-col justify-between gap-3 shadow-xs">
                   <div>
-                    <h4 className="text-sm font-semibold text-white">{appr.title}</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Action: <span className="font-mono text-amber-400">{appr.action_type}</span> | Target: {appr.payload?.recipient || 'Enterprise Entity'}
+                    <h4 className="text-sm font-bold text-slate-900">{appr.title}</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Action: <span className="font-mono font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">{appr.action_type}</span> | Target: {appr.payload?.recipient || 'Enterprise Entity'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <button
                       onClick={() => handleDecision(appr.id, 'approve')}
-                      className="flex-1 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1 transition-colors"
+                      className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" /> Authorize
                     </button>
                     <button
                       onClick={() => handleDecision(appr.id, 'reject')}
-                      className="flex-1 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center justify-center gap-1 transition-colors"
+                      className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
                     >
                       <XCircle className="w-3.5 h-3.5" /> Reject
                     </button>
@@ -186,27 +186,27 @@ export const AgentsPage: React.FC = () => {
       )}
 
       {/* Execution Runs History */}
-      <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">LangGraph Execution Runs</h3>
-          <span className="text-xs text-slate-500">Live Agent Audit Trail</span>
+      <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h3 className="text-sm font-bold text-slate-900">LangGraph Execution Trace History</h3>
+          <span className="text-xs text-slate-500 font-semibold">{runs.length} runs recorded</span>
         </div>
 
-        <div className="divide-y divide-slate-800/60">
+        <div className="divide-y divide-slate-100">
           {runs.map((run) => (
-            <div key={run.id} className="p-5 space-y-3">
+            <div key={run.id} className="p-5 space-y-3 hover:bg-slate-50/40 transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-white">{run.workflow_name}</span>
-                  <span className="text-xs text-slate-500 font-mono">({run.id.slice(0, 8)})</span>
+                  <span className="font-bold text-sm text-slate-900">{run.workflow_name}</span>
+                  <span className="text-xs text-slate-400 font-mono">({run.id.slice(0, 8)})</span>
                 </div>
                 <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${
+                  className={`text-xs px-3 py-1 rounded-full font-bold border ${
                     run.status === 'completed'
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : run.status === 'paused_for_approval'
-                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
                   }`}
                 >
                   {run.status.replace(/_/g, ' ')}
@@ -214,14 +214,14 @@ export const AgentsPage: React.FC = () => {
               </div>
 
               {/* State Machine Step Trace */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1">
                 {run.steps.map((step) => (
-                  <div key={step.id} className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-xs">
+                  <div key={step.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
                     <div className="flex items-center justify-between text-slate-400 mb-1">
-                      <span className="font-mono text-[10px]">Node {step.step_number}</span>
-                      <span className="text-[10px] text-emerald-400">●</span>
+                      <span className="font-mono text-[10px] font-bold text-slate-500">Node {step.step_number}</span>
+                      <span className="text-[10px] text-emerald-600 font-bold">✓</span>
                     </div>
-                    <p className="font-semibold text-slate-200 capitalize">{step.node_name.replace(/_/g, ' ')}</p>
+                    <p className="font-bold text-slate-800 capitalize">{step.node_name.replace(/_/g, ' ')}</p>
                   </div>
                 ))}
               </div>
