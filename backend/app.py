@@ -21,46 +21,42 @@ from dotenv import load_dotenv
 
 
 # ============================================================
-# OPENAI / GROQ IMPORT
+# LOAD ENVIRONMENT VARIABLES & GROQ ENGINE
 # ============================================================
 
-try:
-    from groq import Groq
-except ImportError:
-    Groq = None
+_backend_dir = os.path.dirname(os.path.abspath(__file__))
+_backend_env = os.path.join(_backend_dir, ".env")
+_root_env = os.path.join(os.path.dirname(_backend_dir), ".env")
 
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+# Use override=False so Render container environment variables always take precedence
+load_dotenv(dotenv_path=_backend_env, override=False)
+load_dotenv(dotenv_path=_root_env, override=False)
 
+from Chatbot import (
+    resolve_groq_api_key,
+    get_groq_config,
+    get_groq_client,
+    ask_groq
+)
 
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
-# ============================================================
-
-_backend_env = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-_root_env = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
-
-load_dotenv(dotenv_path=_root_env, override=True)
-load_dotenv(dotenv_path=_backend_env, override=True)
-
-
-# ============================================================
-# API KEYS & CONFIGURATION
-# ============================================================
-
+GROQ_API_KEY, GROQ_BASE_URL, GROQ_MODEL, GROQ_VAR_NAME = get_groq_config()
 OPENWEATHER_API_KEY = (os.getenv("OPENWEATHER_API_KEY") or "").strip().strip('"').strip("'")
-GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip().strip('"').strip("'")
-GROQ_BASE_URL = (os.getenv("GROQ_BASE_URL") or "https://api.groq.com/openai/v1").strip().strip('"').strip("'")
-GROQ_MODEL = (os.getenv("GROQ_MODEL") or "openai/gpt-oss-120b").strip().strip('"').strip("'")
+
+if GROQ_API_KEY:
+    print(f"Groq AI Key detected from variable '{GROQ_VAR_NAME}' (prefix: {GROQ_API_KEY[:8]}...)")
+else:
+    print("WARNING: GROQ_API_KEY is not set in environment variables or .env.")
+
+if OPENWEATHER_API_KEY:
+    print("OpenWeather API Key detected.")
+else:
+    print("WARNING: OPENWEATHER_API_KEY is not set.")
 
 
 # ============================================================
 # FLASK APP & STATIC FRONTEND SERVING
 # ============================================================
 
-_backend_dir = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(_backend_dir, "static")
 if not os.path.exists(STATIC_DIR):
     _alt_dist = os.path.abspath(os.path.join(_backend_dir, "..", "frontend", "dist"))
@@ -74,63 +70,6 @@ app = Flask(
 )
 
 CORS(app, resources={r"/*": {"origins": "*"}}, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-
-
-# ============================================================
-# GROQ AI CLIENT (via OpenAI SDK base_url)
-# ============================================================
-
-groq_client = None
-
-
-def get_or_create_groq_client():
-    global groq_client, GROQ_API_KEY, GROQ_BASE_URL, GROQ_MODEL
-    load_dotenv(dotenv_path=_root_env, override=True)
-    load_dotenv(dotenv_path=_backend_env, override=True)
-    GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip().strip('"').strip("'")
-    GROQ_BASE_URL = (os.getenv("GROQ_BASE_URL") or "https://api.groq.com/openai/v1").strip().strip('"').strip("'")
-    GROQ_MODEL = (os.getenv("GROQ_MODEL") or "openai/gpt-oss-120b").strip().strip('"').strip("'")
-
-    if not GROQ_API_KEY:
-        return None
-
-    if groq_client is not None:
-        return groq_client
-
-    # 1. Prefer official Groq SDK
-    if Groq is not None:
-        try:
-            kwargs = {"api_key": GROQ_API_KEY}
-            if GROQ_BASE_URL and GROQ_BASE_URL != "https://api.groq.com/openai/v1":
-                kwargs["base_url"] = GROQ_BASE_URL
-            groq_client = Groq(**kwargs)
-            print("Groq AI client (official Groq SDK) initialized successfully.")
-            return groq_client
-        except Exception as e:
-            print("WARNING: Groq SDK initialization failed:", e)
-
-    # 2. Fallback to OpenAI SDK
-    if OpenAI is not None:
-        try:
-            groq_client = OpenAI(
-                api_key=GROQ_API_KEY,
-                base_url=GROQ_BASE_URL,
-            )
-            print("Groq AI client (OpenAI base_url) initialized successfully.")
-            return groq_client
-        except Exception as e:
-            print("WARNING: Groq client (OpenAI SDK) initialization failed:", e)
-
-    return None
-
-
-# Initial attempt at startup
-get_or_create_groq_client()
-
-if not GROQ_API_KEY:
-    print("WARNING: GROQ_API_KEY is missing or empty in .env.")
-if OpenAI is None:
-    print("WARNING: openai package is not installed.")
 
 
 
@@ -1114,89 +1053,35 @@ def handle_404(e):
 # ============================================================
 
 @app.route(
-
     "/health",
-
     methods=["GET"]
-
 )
-
 def health():
+    current_groq_key, _, current_model, var_name = get_groq_config()
+    current_weather_key = (os.getenv("OPENWEATHER_API_KEY") or "").strip().strip('"').strip("'")
 
     return jsonify({
-
-        "status":
-
-            "healthy",
-
-        "weather_api":
-
-            bool(
-
-                OPENWEATHER_API_KEY
-
-            ),
-
-        "groq_ai":
-
-            bool(
-
-                get_or_create_groq_client() is not None
-
-            ),
-
-        "groq_model":
-
-            GROQ_MODEL,
-
-        "featherless_ai":
-
-            bool(
-
-                get_or_create_groq_client() is not None
-
-            ),
-
-        "model_loaded":
-
-            model is not None,
-
-        "model_features":
-
-            (
-
-                model.n_features_in_
-
-                if model is not None
-                and hasattr(
-                    model,
-                    "n_features_in_"
-                )
-
-                else None
-
-            ),
-
-        "model_feature_names":
-
-            (
-
-                model.feature_names_in_.tolist()
-
-                if model is not None
-                and hasattr(
-                    model,
-                    "feature_names_in_"
-                )
-
-                else None
-
-            ),
-
-        "featherless_model":
-
-            GROQ_MODEL
-
+        "status": "healthy",
+        "weather_api": bool(current_weather_key),
+        "groq_ai": bool(current_groq_key),
+        "groq_configured": bool(current_groq_key),
+        "groq_env_var": var_name or "NOT_FOUND",
+        "groq_key_prefix": (current_groq_key[:8] + "...") if current_groq_key else None,
+        "groq_key_length": len(current_groq_key) if current_groq_key else 0,
+        "groq_model": current_model,
+        "featherless_ai": bool(current_groq_key),
+        "featherless_model": current_model,
+        "model_loaded": model is not None,
+        "model_features": (
+            model.n_features_in_
+            if model is not None and hasattr(model, "n_features_in_")
+            else None
+        ),
+        "model_feature_names": (
+            model.feature_names_in_.tolist()
+            if model is not None and hasattr(model, "feature_names_in_")
+            else None
+        )
     })
 
 
@@ -1899,226 +1784,20 @@ def predict_city():
 # AI CHATBOT
 # ============================================================
 
-@app.route(
-
-    "/chat",
-
-    methods=["POST"]
-
-)
-
+@app.route("/chat", methods=["POST"])
 def chat():
-
     try:
-
-        # ====================================================
-        # CHECK AI CLIENT
-        # ====================================================
-
-        client = get_or_create_groq_client()
-
-        if client is None:
-            return jsonify({
-                "response": (
-                    "⚠️ **AI Assistant Notice**: `GROQ_API_KEY` is not configured in the Render Environment Variables.\n\n"
-                    "**Immediate Emergency Guidelines:**\n"
-                    "• **Floods**: Move to higher ground, do not walk/drive through flood waters, turn off electricity mains.\n"
-                    "• **Cyclones**: Stay indoors, keep away from windows, secure loose outdoor objects.\n"
-                    "• **Heatwaves**: Stay hydrated, avoid direct sun between 12 PM - 3 PM, wear light cotton clothing.\n"
-                    "• **National Emergency Helpline**: Call **112** or Disaster Control **1070/1077**.\n\n"
-                    "*To enable real-time AI responses, please add `GROQ_API_KEY` in your Render service's Environment tab.*"
-                ),
-                "reply": "Please configure GROQ_API_KEY in Render Environment Variables."
-            }), 200
-
-
-        # ====================================================
-        # GET MESSAGE
-        # ====================================================
-
-        data = request.get_json(
-
-            silent=True
-
-        ) or {}
-
-
-        message = data.get(
-
-            "message",
-
-            ""
-
-        )
-
-
-        if not isinstance(
-
-            message,
-
-            str
-
-        ):
-
-            message = str(
-
-                message
-
-            )
-
-
+        data = request.get_json(silent=True) or {}
+        message = data.get("message", "")
+        if not isinstance(message, str):
+            message = str(message)
         message = message.strip()
 
-
         if not message:
+            return jsonify({"error": "Message is required."}), 400
 
-            return jsonify({
-
-                "error":
-
-                    "Message is required."
-
-            }), 400
-
-
-        # ====================================================
-        # DEBUG
-        # ====================================================
-
-        print("")
-
-        print(
-            "=========================================="
-        )
-
-        print(
-            "CHAT REQUEST (GROQ)"
-        )
-
-        print(
-            "Message:",
-            message
-        )
-
-        print(
-            "Model:",
-            GROQ_MODEL
-        )
-
-        print(
-            "=========================================="
-        )
-
-
-        # ====================================================
-        # GROQ REQUEST
-        # ====================================================
-
-        system_instruction = (
-            "You are DisasterAssist, an AI emergency assistant for a disaster management platform. "
-            "Help users with floods, cyclones, heatwaves, earthquakes, severe weather, emergency "
-            "preparedness and disaster safety. "
-            "Answer the user's question directly. "
-            "Do NOT provide internal reasoning. "
-            "Do NOT describe your analysis process. "
-            "Return only the final actionable answer. "
-            "Keep answers clear, practical and reasonably concise. "
-            "Use bullet points when useful."
-        )
-
-        answer = ""
-
-        # Primary: chat.completions.create (compatible with both Groq SDK and OpenAI SDK)
-        try:
-            completion = client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
-                    {"role": "system", "content": system_instruction},
-                    {"role": "user", "content": message}
-                ],
-                temperature=0.7,
-                max_tokens=2048,
-            )
-            if completion and completion.choices:
-                answer = (completion.choices[0].message.content or "").strip()
-        except Exception as chat_err:
-            print(f"[app.py] chat.completions.create error: {chat_err}")
-            # Secondary fallback: responses.create if available on experimental clients
-            try:
-                response = client.responses.create(
-                    input=message,
-                    instructions=system_instruction,
-                    model=GROQ_MODEL,
-                )
-                res_text = getattr(response, "output_text", None)
-                if not res_text and hasattr(response, "output") and response.output:
-                    res_text = response.output[0].text
-                if res_text:
-                    answer = str(res_text).strip()
-            except Exception as resp_err:
-                print(f"[app.py] responses.create fallback error: {resp_err}")
-
-
-        # ====================================================
-        # EMPTY RESPONSE CHECK
-        # ====================================================
-
-        if not answer:
-
-            print("")
-
-            print(
-                "=========================================="
-            )
-
-            print(
-                "❌ GROQ EMPTY CONTENT"
-            )
-
-            print(
-                "=========================================="
-            )
-
-
-            return jsonify({
-
-                "error":
-
-                    "Groq AI did not return a response."
-
-            }), 500
-
-
-        # ====================================================
-        # SUCCESS
-        # ====================================================
-
-        print("")
-
-        print(
-            "=========================================="
-        )
-
-        print(
-            "✅ GROQ AI RESPONSE"
-        )
-
-        print(
-            "=========================================="
-        )
-
-        print(
-
-            answer
-
-        )
-
-        print(
-            "=========================================="
-        )
-
-        print("")
-
+        print(f"[app.py /chat] Processing query: {message[:100]}")
+        answer = ask_groq(message)
 
         return jsonify({
             "response": answer,
@@ -2127,13 +1806,7 @@ def chat():
         })
 
     except Exception as e:
-        print("")
-        print("==========================================")
-        print("❌ CHAT ERROR")
-        print(type(e).__name__, ":", str(e))
-        print("==========================================")
-        print("")
-
+        print(f"[app.py /chat] Error: {type(e).__name__}: {str(e)}")
         return jsonify({
             "response": (
                 f"⚠️ *The AI service encountered an issue ({str(e)}).* \n\n"
@@ -2155,79 +1828,31 @@ def chat():
 if __name__ == "__main__":
 
     print("")
-
-    print(
-        "=========================================="
-    )
-
-    print(
-        "   AI DISASTER MANAGEMENT SYSTEM"
-    )
-
-    print(
-        "=========================================="
-    )
-
+    print("==========================================")
+    print("   AI DISASTER MANAGEMENT SYSTEM")
+    print("==========================================")
     print("")
 
-
-    print(
-        "Backend: http://127.0.0.1:5000"
-    )
-
-    print(
-        "Weather: /weather"
-    )
-
-    print(
-        "Prediction: /predict"
-    )
-
-    print(
-        "City Prediction: /predict-city"
-    )
-
-    print(
-        "AI Chatbot: /chat"
-    )
-
-    print(
-        "Health: /health"
-    )
-
+    print("Backend: http://127.0.0.1:5000")
+    print("Weather: /weather")
+    print("Prediction: /predict")
+    print("City Prediction: /predict-city")
+    print("AI Chatbot: /chat")
+    print("Health: /health")
     print("")
 
+    k, u, m, v = get_groq_config()
+    print("Groq Model:", m)
 
-    print(
-        "Groq Model:",
-        GROQ_MODEL
-    )
-
-
-    if GROQ_API_KEY:
-
-        print(
-            "Groq AI: CONNECTED"
-        )
-
+    if k:
+        print(f"Groq AI: CONNECTED (via {v}, prefix {k[:8]}...)")
     else:
-
-        print(
-            "Groq AI: API KEY MISSING (Set GROQ_API_KEY in backend/.env)"
-        )
-
+        print("Groq AI: API KEY MISSING (Set GROQ_API_KEY in Render Environment Variables)")
 
     if OPENWEATHER_API_KEY:
-
-        print(
-            "OpenWeather: CONNECTED"
-        )
-
+        print("OpenWeather: CONNECTED")
     else:
-
-        print(
-            "OpenWeather: API KEY MISSING"
-        )
+        print("OpenWeather: API KEY MISSING")
 
 
     # ========================================================
