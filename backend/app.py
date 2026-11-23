@@ -71,7 +71,7 @@ app = Flask(
     static_url_path=""
 )
 
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 
 # ============================================================
@@ -115,7 +115,9 @@ if OpenAI is None:
 # LOAD DISASTER ML MODEL
 # ============================================================
 
-MODEL_PATH = "disaster_model.pkl"
+MODEL_PATH = os.path.join(_backend_dir, "disaster_model.pkl")
+if not os.path.exists(MODEL_PATH):
+    MODEL_PATH = "disaster_model.pkl"
 
 model = None
 
@@ -205,11 +207,15 @@ def safe_number(
 # ============================================================
 
 def get_weather(city):
+    global OPENWEATHER_API_KEY
+    if not OPENWEATHER_API_KEY:
+        load_dotenv(dotenv_path=_root_env, override=True)
+        load_dotenv(dotenv_path=_backend_env, override=True)
+        OPENWEATHER_API_KEY = (os.getenv("OPENWEATHER_API_KEY") or "").strip().strip('"').strip("'")
 
     if not OPENWEATHER_API_KEY:
-
         raise Exception(
-            "OPENWEATHER_API_KEY is missing."
+            "OPENWEATHER_API_KEY is not configured. Please add OPENWEATHER_API_KEY to your Render Environment Variables."
         )
 
 
@@ -1889,19 +1895,18 @@ def chat():
         client = get_or_create_groq_client()
 
         if client is None:
-
             return jsonify({
-
-                "error":
-
-                    (
-
-                        "Groq AI is not configured. "
-                        "Please set GROQ_API_KEY in backend/.env and save the file (Ctrl+S)."
-
-                    )
-
-            }), 500
+                "response": (
+                    "⚠️ **AI Assistant Notice**: `GROQ_API_KEY` is not configured in the Render Environment Variables.\n\n"
+                    "**Immediate Emergency Guidelines:**\n"
+                    "• **Floods**: Move to higher ground, do not walk/drive through flood waters, turn off electricity mains.\n"
+                    "• **Cyclones**: Stay indoors, keep away from windows, secure loose outdoor objects.\n"
+                    "• **Heatwaves**: Stay hydrated, avoid direct sun between 12 PM - 3 PM, wear light cotton clothing.\n"
+                    "• **National Emergency Helpline**: Call **112** or Disaster Control **1070/1077**.\n\n"
+                    "*To enable real-time AI responses, please add `GROQ_API_KEY` in your Render service's Environment tab.*"
+                ),
+                "reply": "Please configure GROQ_API_KEY in Render Environment Variables."
+            }), 200
 
 
         # ====================================================
@@ -2174,50 +2179,31 @@ def chat():
 
 
         return jsonify({
-
-            "reply":
-
-                answer
-
+            "response": answer,
+            "reply": answer,
+            "answer": answer
         })
 
-
     except Exception as e:
-
         print("")
-
-        print(
-            "=========================================="
-        )
-
-        print(
-            "❌ CHAT ERROR"
-        )
-
-        print(
-
-            type(e).__name__,
-
-            ":",
-
-            str(e)
-
-        )
-
-        print(
-            "=========================================="
-        )
-
+        print("==========================================")
+        print("❌ CHAT ERROR")
+        print(type(e).__name__, ":", str(e))
+        print("==========================================")
         print("")
-
 
         return jsonify({
-
-            "error":
-
-                str(e)
-
-        }), 500
+            "response": (
+                f"⚠️ *The AI service encountered an issue ({str(e)}).* \n\n"
+                "**Emergency Quick Tips:**\n"
+                "• **Floods**: Move immediately to higher ground and stay away from power cables.\n"
+                "• **Cyclones**: Stay inside a solid room away from windows.\n"
+                "• **Heatwaves**: Drink ORS/water frequently.\n"
+                "• **Emergency Number**: Call **112** for prompt assistance."
+            ),
+            "reply": str(e),
+            "error": str(e)
+        }), 200
 
 
 # ============================================================
