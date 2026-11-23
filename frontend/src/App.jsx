@@ -926,7 +926,7 @@ function App() {
         <div className="header-left">
 
           <div className="logo">
-            🌍
+            <img src="/logo.svg" alt="Disaster Prediction System Logo" className="logo-img" />
           </div>
 
 
