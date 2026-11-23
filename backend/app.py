@@ -25,11 +25,13 @@ from dotenv import load_dotenv
 # ============================================================
 
 try:
-
-    from openai import OpenAI
-
+    from groq import Groq
 except ImportError:
+    Groq = None
 
+try:
+    from openai import OpenAI
+except ImportError:
     OpenAI = None
 
 
@@ -83,22 +85,43 @@ groq_client = None
 
 def get_or_create_groq_client():
     global groq_client, GROQ_API_KEY, GROQ_BASE_URL, GROQ_MODEL
-    if groq_client is None:
-        load_dotenv(dotenv_path=_root_env, override=True)
-        load_dotenv(dotenv_path=_backend_env, override=True)
-        GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip().strip('"').strip("'")
-        GROQ_BASE_URL = (os.getenv("GROQ_BASE_URL") or "https://api.groq.com/openai/v1").strip().strip('"').strip("'")
-        GROQ_MODEL = (os.getenv("GROQ_MODEL") or "openai/gpt-oss-120b").strip().strip('"').strip("'")
-        if GROQ_API_KEY and OpenAI:
-            try:
-                groq_client = OpenAI(
-                    api_key=GROQ_API_KEY,
-                    base_url=GROQ_BASE_URL,
-                )
-                print("Groq AI client (OpenAI base_url) initialized successfully.")
-            except Exception as e:
-                print("WARNING: Groq client initialization failed:", e)
-    return groq_client
+    load_dotenv(dotenv_path=_root_env, override=True)
+    load_dotenv(dotenv_path=_backend_env, override=True)
+    GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip().strip('"').strip("'")
+    GROQ_BASE_URL = (os.getenv("GROQ_BASE_URL") or "https://api.groq.com/openai/v1").strip().strip('"').strip("'")
+    GROQ_MODEL = (os.getenv("GROQ_MODEL") or "openai/gpt-oss-120b").strip().strip('"').strip("'")
+
+    if not GROQ_API_KEY:
+        return None
+
+    if groq_client is not None:
+        return groq_client
+
+    # 1. Prefer official Groq SDK
+    if Groq is not None:
+        try:
+            kwargs = {"api_key": GROQ_API_KEY}
+            if GROQ_BASE_URL and GROQ_BASE_URL != "https://api.groq.com/openai/v1":
+                kwargs["base_url"] = GROQ_BASE_URL
+            groq_client = Groq(**kwargs)
+            print("Groq AI client (official Groq SDK) initialized successfully.")
+            return groq_client
+        except Exception as e:
+            print("WARNING: Groq SDK initialization failed:", e)
+
+    # 2. Fallback to OpenAI SDK
+    if OpenAI is not None:
+        try:
+            groq_client = OpenAI(
+                api_key=GROQ_API_KEY,
+                base_url=GROQ_BASE_URL,
+            )
+            print("Groq AI client (OpenAI base_url) initialized successfully.")
+            return groq_client
+        except Exception as e:
+            print("WARNING: Groq client (OpenAI SDK) initialization failed:", e)
+
+    return None
 
 
 # Initial attempt at startup
@@ -1988,133 +2011,52 @@ def chat():
 
 
         # ====================================================
-        # GROQ REQUEST (Responses API with fallback)
+        # GROQ REQUEST
         # ====================================================
+
+        system_instruction = (
+            "You are DisasterAssist, an AI emergency assistant for a disaster management platform. "
+            "Help users with floods, cyclones, heatwaves, earthquakes, severe weather, emergency "
+            "preparedness and disaster safety. "
+            "Answer the user's question directly. "
+            "Do NOT provide internal reasoning. "
+            "Do NOT describe your analysis process. "
+            "Return only the final actionable answer. "
+            "Keep answers clear, practical and reasonably concise. "
+            "Use bullet points when useful."
+        )
 
         answer = ""
 
+        # Primary: chat.completions.create (compatible with both Groq SDK and OpenAI SDK)
         try:
-
-            response = client.responses.create(
-
-                input=message,
-
-                instructions=(
-
-                    "You are DisasterAssist, an AI emergency "
-                    "assistant for a disaster management platform. "
-                    "Help users with floods, cyclones, heatwaves, "
-                    "earthquakes, severe weather, emergency "
-                    "preparedness and disaster safety. "
-                    "Answer the user's question directly. "
-                    "Do NOT provide internal reasoning. "
-                    "Do NOT describe your analysis process. "
-                    "Return only the final actionable answer. "
-                    "Keep answers clear, practical and reasonably concise. "
-                    "Use bullet points when useful."
-
-                ),
-
+            completion = client.chat.completions.create(
                 model=GROQ_MODEL,
-
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": message}
+                ],
+                temperature=0.7,
+                max_tokens=2048,
             )
-
-            res_text = getattr(response, "output_text", None)
-
-            if not res_text and hasattr(response, "output") and response.output:
-
-                res_text = response.output[0].text
-
-            if res_text:
-
-                answer = str(res_text).strip()
-
-        except Exception as responses_err:
-
-            print(f"[app.py] Groq responses.create fallback: {responses_err}")
-
-
-        # Fallback to chat completions if responses.create did not return text
-        if not answer:
-
-            completion = (
-
-                client.chat.completions.create(
-
+            if completion and completion.choices:
+                answer = (completion.choices[0].message.content or "").strip()
+        except Exception as chat_err:
+            print(f"[app.py] chat.completions.create error: {chat_err}")
+            # Secondary fallback: responses.create if available on experimental clients
+            try:
+                response = client.responses.create(
+                    input=message,
+                    instructions=system_instruction,
                     model=GROQ_MODEL,
-
-                    messages=[
-
-                        {
-
-                            "role":
-                                "system",
-
-                            "content":
-
-                                (
-
-                                    "You are DisasterAssist, an AI emergency "
-                                    "assistant for a disaster management platform. "
-                                    "Help users with floods, cyclones, heatwaves, "
-                                    "earthquakes, severe weather, emergency "
-                                    "preparedness and disaster safety. "
-                                    "Answer the user's question directly. "
-                                    "Do NOT provide internal reasoning. "
-                                    "Do NOT describe your analysis process. "
-                                    "Return only the final actionable answer. "
-                                    "Keep answers clear, practical and reasonably concise. "
-                                    "Use bullet points when useful."
-
-                                )
-
-                        },
-
-                        {
-
-                            "role":
-                                "user",
-
-                            "content":
-                                message
-
-                        }
-
-                    ],
-
-                    temperature=1,
-
-                    max_completion_tokens=2048,
-
-                    top_p=1,
-
-                    reasoning_effort="medium",
-
-                    stream=True,
-
-                    stop=None
-
                 )
-
-            )
-
-            full_content = ""
-
-            for chunk in completion:
-
-                if (
-
-                    chunk.choices
-
-                    and chunk.choices[0].delta
-
-                    and chunk.choices[0].delta.content
-
-                ):
-
-                    full_content += chunk.choices[0].delta.content
-
-            answer = full_content.strip()
+                res_text = getattr(response, "output_text", None)
+                if not res_text and hasattr(response, "output") and response.output:
+                    res_text = response.output[0].text
+                if res_text:
+                    answer = str(res_text).strip()
+            except Exception as resp_err:
+                print(f"[app.py] responses.create fallback error: {resp_err}")
 
 
         # ====================================================
