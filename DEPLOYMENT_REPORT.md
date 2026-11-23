@@ -177,22 +177,22 @@ databases:
 
 ---
 
-## 6. Next Steps for Live Render Deployment (Phases 9–12)
+## 6. Live Render Deployment Status (Phases 9–12)
 
-Since external credentials (GitHub repository authorization and Render account login) must never be shared or handled insecurely, follow these steps to trigger the cloud deployment on Render:
+The complete project has been pushed to GitHub:
+- **Repository**: `https://github.com/suriyaprakash-devx/disaster-prediction-alert-system`
+- **Branch**: `designops-ai`
+- **Direct GitHub Branch Link**: `https://github.com/suriyaprakash-devx/disaster-prediction-alert-system/tree/designops-ai`
 
-1. **Push Git Commit to your GitHub account**:
-   ```bash
-   # Create a repository on GitHub named 'designops-ai'
-   git remote add origin https://github.com/<your-username>/designops-ai.git
-   git branch -M main
-   git push -u origin main
-   ```
-
-2. **Deploy on Render**:
-   - Go to [dashboard.render.com](https://dashboard.render.com).
-   - Click **New +** > **Blueprint**.
-   - Select your `designops-ai` repository.
-   - When prompted for `GROQ_API_KEY`, input your Groq key.
-   - Click **Apply**.
-   - Render will automatically provision the PostgreSQL database, build the Python backend, seed the initial database, and deploy the React frontend static site.
+### Render Blueprint Deployment Steps:
+1. Go to [dashboard.render.com](https://dashboard.render.com).
+2. Click **New +** > **Blueprint**.
+3. Select `disaster-prediction-alert-system`.
+4. In the Blueprint configuration dialog:
+   - Set **Branch** to: `designops-ai`
+5. Render will discover:
+   - `designops-ai-backend` (Python Web Service with `/health`)
+   - `designops-ai-frontend` (Static Site with SPA rewrite rules)
+   - `designops-db` (PostgreSQL Database)
+6. When prompted for environment variable `GROQ_API_KEY`, input your key (`gsk_...`).
+7. Click **Apply**. Render will automatically provision the database, execute `python -m app.seed`, build the React frontend, and deploy both services live.

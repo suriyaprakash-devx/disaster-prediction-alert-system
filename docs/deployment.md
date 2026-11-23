@@ -15,21 +15,16 @@ This guide walks through deploying the complete DesignOps AI platform to Render.
 
 ## 2. Deployment via Render Blueprint (Recommended)
 
-1. **Push your code to GitHub**:
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: complete DesignOps AI platform with Render blueprint"
-   git remote add origin https://github.com/<your-username>/designops-ai.git
-   git branch -M main
-   git push -u origin main
-   ```
+1. **Repository Link**:
+   - Repository: `https://github.com/suriyaprakash-devx/disaster-prediction-alert-system`
+   - Branch: `designops-ai`
 
 2. **Navigate to Render**:
    - Go to [dashboard.render.com](https://dashboard.render.com).
    - Click **New +** > **Blueprint**.
-   - Connect your GitHub repository.
-   - Render will parse `render.yaml` and discover three services:
+   - Connect your `disaster-prediction-alert-system` repository.
+   - When prompted for **Branch**, select or specify **`designops-ai`**.
+   - Render will parse `render.yaml` from the `designops-ai` branch and discover three services:
      - `designops-ai-backend` (Python Web Service)
      - `designops-ai-frontend` (Static Site)
      - `designops-db` (PostgreSQL Database)
